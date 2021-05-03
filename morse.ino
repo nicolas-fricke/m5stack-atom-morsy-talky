@@ -39,7 +39,7 @@ byte characterIdentifier = 0;
 // to alphanumerics:
 //                 0         1         2         3         4         5         6
 //                 01234567890123456789012345678901234567890123456789012345678901234
-char morse[256] = "  etinamsdrgukwohblzfcp vx q yj 56&7   8 /+  ( 94=      3   2 10";
+char morse[256] = "  ETINAMSDRGUKWOHBLZFCP VX Q YJ 56&7   8 /+  ( 94=      3   2 10";
 
 void loop()
 {
