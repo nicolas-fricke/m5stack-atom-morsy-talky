@@ -10,8 +10,8 @@ Adafruit_NeoMatrix matrix = Adafruit_NeoMatrix(5, 5, PIN,
   NEO_MATRIX_COLUMNS + NEO_MATRIX_PROGRESSIVE,
   NEO_GRB + NEO_KHZ800);
 
-const uint16_t red = matrix.Color(255, 0, 0);
-const uint16_t green = matrix.Color(0, 255, 0);
+const uint16_t green = matrix.Color(255, 0, 0);
+const uint16_t red = matrix.Color(0, 255, 0);
 const uint16_t blue = matrix.Color(0, 0, 255);
 
 void setup()
@@ -39,7 +39,7 @@ byte characterIdentifier = 0;
 // to alphanumerics:
 //                 0         1         2         3         4         5         6
 //                 01234567890123456789012345678901234567890123456789012345678901234
-char morse[256] = "  etinamsdrgukwohblzfcp vx q yj 56&7   8 /+  ( 94=      3   2 10";
+char morse[256] = "  ETINAMSDRGUKWOHBLZFCP VX Q YJ 56&7   8 /+  ( 94=      3   2 10";
 
 void loop()
 {
@@ -47,14 +47,12 @@ void loop()
   {
     matrix.fillScreen(red);
   }
-
-  if (M5.Btn.pressedFor(200))
+  else if (M5.Btn.pressedFor(200))
   {
     isLongPress = true;
     matrix.fillScreen(green);
   }
-
-  if (M5.Btn.wasReleased())
+  else if (M5.Btn.wasReleased())
   {
     if (isLongPress)
     {
@@ -73,8 +71,7 @@ void loop()
 
     matrix.fillScreen(0);
   }
-
-  if (isTypingCharacter && M5.Btn.releasedFor(500))
+  else if (isTypingCharacter && M5.Btn.releasedFor(500))
   {
     isTypingCharacter = false;
     Serial.print(" ");
@@ -83,15 +80,19 @@ void loop()
     Serial.print(" ");
     Serial.print(morse[characterIdentifier]);
     Serial.print(" ");
+    Serial.println();
+
+    matrix.setCursor(0, 0);
+    matrix.print(morse[characterIdentifier]);
+
     characterCount = 0;
     characterIdentifier = 0;
-    Serial.println();
   }
-
-  if (isTypingWord && M5.Btn.releasedFor(1500))
+  else if (isTypingWord && M5.Btn.releasedFor(1500))
   {
     isTypingWord = false;
     Serial.print("\n\n / \n\n");
+    matrix.fillScreen(0);
   }
 
   matrix.show();
