@@ -1,71 +1,70 @@
+#include <M5Atom.h>
 #include <WiFi.h>
 #include <WebSocketsClient.h>
 #include <SocketIOclient.h>
-
-
-#include <M5Atom.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_NeoMatrix.h>
 #include <Adafruit_NeoPixel.h>
+#include <Servo.h>
 
 #define LED_MATRIX_PIN 27
+#define SERVO_MOTOR_PIN 22
+#define SERVO_SENSOR_PIN 25
+// Connect the Servo's brown wire to ground (G) and the red wire to 3.3V (3V3)
 
-//WiFi wiFi;
-SocketIOclient socketIO;
-
-const char *ssid = "Galaxy S21";
-const char *password = "123456789";
-
+// Initialize the color matrix
 Adafruit_NeoMatrix matrix = Adafruit_NeoMatrix(5, 5, LED_MATRIX_PIN,
-                                               NEO_MATRIX_TOP + NEO_MATRIX_RIGHT +
-                                                   NEO_MATRIX_COLUMNS + NEO_MATRIX_PROGRESSIVE,
-                                               NEO_GRB + NEO_KHZ800);
+  NEO_MATRIX_TOP + NEO_MATRIX_RIGHT +
+  NEO_MATRIX_COLUMNS + NEO_MATRIX_PROGRESSIVE,
+  NEO_GRB + NEO_KHZ800);
 
 const uint16_t red = matrix.Color(255, 0, 0);
 const uint16_t green = matrix.Color(0, 255, 0);
 const uint16_t blue = matrix.Color(0, 0, 255);
 
-void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
-{
-  Serial.println("type");
-  Serial.println(type);
-  switch (type)
-  {
-  case sIOtype_DISCONNECT:
-    Serial.printf("[IOc] Disconnected!\n");
-    break;
-  case sIOtype_CONNECT:
-    Serial.printf("[IOc] Connected to url: %s\n", payload);
+// Initialize the servo
+Servo servo;
 
-    // join default namespace (no auto join in Socket.IO V3)
-    socketIO.send(sIOtype_CONNECT, "/");
-    break;
-  case sIOtype_EVENT:
-    Serial.printf("[IOc] get event: %s\n", payload);
-    break;
-  case sIOtype_ACK:
-    Serial.printf("[IOc] get ack: %u\n", length);
-    //hexdump(payload, length);
-    break;
-  case sIOtype_ERROR:
-    Serial.printf("[IOc] get error: %u\n", length);
-    //hexdump(payload, length);
-    break;
-  case sIOtype_BINARY_EVENT:
-    Serial.printf("[IOc] get binary: %u\n", length);
-    //hexdump(payload, length);
-    break;
-  case sIOtype_BINARY_ACK:
-    Serial.printf("[IOc] get binary ack: %u\n", length);
-    //hexdump(payload, length);
-    break;
-  }
-}
+int minFlagPosition;
+int maxFlagPosition;
+
+
+// Initialize the Wifi connection
+SocketIOclient socketIO;
+
+const char *ssid = "Galaxy S21";
+const char *password = "123456789";
+
+// Initialize morse parsing
+bool isLongPress = false;
+bool isTypingCharacter = false;
+bool isTypingWord = false;
+
+// Use binary representation for encoding the morse character. For each "." we
+// set the bit to 0 and each "-" is a 1. Then, each character is delimited by
+// one final 1 bit.
+byte characterCount = 0;
+byte characterIdentifier = 0;
+
+// With that encoding, this lookup table can be used to translate the caracters
+// to alphanumerics:
+//                 0         1         2         3         4         5         6
+//                 01234567890123456789012345678901234567890123456789012345678901234
+char morse[256] = "  ETINAMSDRGUKWOHBLZFCP VX Q YJ 56&7   8 /+  ( 94=      3   2 10";
+
+// TODO: Just for debugging. TO REMOVE LATER.
+int i = 0;
 
 void setup()
 {
+  Serial.println();
+
   M5.begin(true, false, false);
   delay(10);
+
+  initializeServo();
+
+  pinMode(SERVO_SENSOR_PIN, INPUT);
 
   matrix.begin();
   matrix.setTextWrap(false);
@@ -124,24 +123,68 @@ void setup()
   matrix.setBrightness(40);
 }
 
-bool isLongPress = false;
-bool isTypingCharacter = false;
-bool isTypingWord = false;
-
-// Use binary representation for encoding the morse character. For each "." we
-// set the bit to 0 and each "-" is a 1. Then, each character is delimited by
-// one final 1 bit.
-byte characterCount = 0;
-byte characterIdentifier = 0;
-
-// With that encoding, this lookup table can be used to translate the caracters
-// to alphanumerics:
-//                 0         1         2         3         4         5         6
-//                 01234567890123456789012345678901234567890123456789012345678901234
-char morse[256] = "  ETINAMSDRGUKWOHBLZFCP VX Q YJ 56&7   8 /+  ( 94=      3   2 10";
-
 void loop()
 {
+  // TODO: Just for debugging. TO REMOVE LATER.
+  if (isFlagRaised()) {
+    matrix.drawPixel(0, 0, blue);
+  } else {
+    matrix.drawPixel(0, 0, 0);
+  }
+
+  resetServo();
+  parseMorse();
+
+// TODO: Just for debugging. TO REMOVE LATER.
+  if (i < 90) {
+    moveServoToAngle(i);
+    i += 2;
+  }
+
+  matrix.show();
+  delay(50);
+  M5.update();
+}
+
+void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
+{
+  Serial.println("type");
+  Serial.println(type);
+  switch (type)
+  {
+  case sIOtype_DISCONNECT:
+    Serial.printf("[IOc] Disconnected!\n");
+    break;
+  case sIOtype_CONNECT:
+    Serial.printf("[IOc] Connected to url: %s\n", payload);
+
+    // join default namespace (no auto join in Socket.IO V3)
+    socketIO.send(sIOtype_CONNECT, "/");
+    break;
+  case sIOtype_EVENT:
+    Serial.printf("[IOc] get event: %s\n", payload);
+    break;
+  case sIOtype_ACK:
+    Serial.printf("[IOc] get ack: %u\n", length);
+    //hexdump(payload, length);
+    break;
+  case sIOtype_ERROR:
+    Serial.printf("[IOc] get error: %u\n", length);
+    //hexdump(payload, length);
+    break;
+  case sIOtype_BINARY_EVENT:
+    Serial.printf("[IOc] get binary: %u\n", length);
+    //hexdump(payload, length);
+    break;
+  case sIOtype_BINARY_ACK:
+    Serial.printf("[IOc] get binary ack: %u\n", length);
+    //hexdump(payload, length);
+    break;
+  }
+}
+
+// Parses the bit we received into dot or dash
+void parseMorse(){
   if (M5.Btn.wasPressed())
   {
     matrix.fillScreen(green);
@@ -193,8 +236,55 @@ void loop()
     Serial.print("\n\n / \n\n");
     matrix.fillScreen(0);
   }
+}
 
-  matrix.show();
-  delay(50);
-  M5.update();
+// Detect the maximum and minimum values measured by the sero feedback
+void initializeServo() {
+  Serial.println("Initializing Servo stops...");
+
+  moveServoToAngle(0);
+  delay(1000);
+  minFlagPosition = flagPosition();
+  Serial.print("Minimum: ");
+  Serial.print(minFlagPosition);
+
+  moveServoToAngle(180);
+  delay(1000);
+  maxFlagPosition = flagPosition();
+
+  Serial.print(" Maximum: ");
+  Serial.println(maxFlagPosition);
+
+  servo.detach();
+}
+
+void moveServoToAngle(int angle) {
+  if (!servo.attached()) {
+    servo.attach(SERVO_MOTOR_PIN);
+  }
+  servo.write(angle);
+}
+
+void resetServo() {
+  Serial.print("flagAngle(): ");
+  Serial.print(flagAngle());
+  Serial.print(" servo.read(): ");
+  Serial.println(servo.read());
+
+  if (abs(servo.read() - flagAngle()) < 5) {
+    Serial.println("detaching servo");
+    servo.detach();
+  }
+}
+
+int flagPosition() {
+  return analogRead(SERVO_SENSOR_PIN);
+}
+
+int flagAngle() {
+  return 180.0 * (flagPosition() - minFlagPosition) / maxFlagPosition;
+}
+
+bool isFlagRaised() {
+  return flagPosition() > (maxFlagPosition + minFlagPosition) / 2;
 }
