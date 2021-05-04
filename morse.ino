@@ -6,6 +6,7 @@
 #include <Adafruit_NeoMatrix.h>
 #include <Adafruit_NeoPixel.h>
 #include <Servo.h>
+#include "config.h"
 
 #define LED_MATRIX_PIN 27
 #define SERVO_MOTOR_PIN 22
@@ -31,9 +32,6 @@ int maxFlagPosition;
 
 // Initialize the Wifi connection
 SocketIOclient socketIO;
-
-const char *ssid = "Galaxy S21";
-const char *password = "123456789";
 
 // Initialize morse parsing
 bool isLongPress = false;
@@ -81,7 +79,7 @@ void setup()
   //   WiFi.softAPdisconnect(true);
   // }
 
-  WiFi.begin(ssid, password);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   while (WiFi.status() != WL_CONNECTED)
   {

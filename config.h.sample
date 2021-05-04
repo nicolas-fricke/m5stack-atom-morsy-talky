@@ -1,0 +1,2 @@
+#define WIFI_SSID "Pica Pica Guests"
+#define WIFI_PASSWORD "hello world"

@@ -1,0 +1,2 @@
+# Ignore configuration that differs for every user
+config.h
