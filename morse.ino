@@ -1,18 +1,66 @@
+#include <WiFi.h>
+#include <WebSocketsClient.h>
+#include <SocketIOclient.h>
+
+
 #include <M5Atom.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_NeoMatrix.h>
 #include <Adafruit_NeoPixel.h>
 
-#define PIN 27
+#define LED_MATRIX_PIN 27
 
-Adafruit_NeoMatrix matrix = Adafruit_NeoMatrix(5, 5, PIN,
-  NEO_MATRIX_TOP + NEO_MATRIX_RIGHT +
-  NEO_MATRIX_COLUMNS + NEO_MATRIX_PROGRESSIVE,
-  NEO_GRB + NEO_KHZ800);
+//WiFi wiFi;
+SocketIOclient socketIO;
+
+const char *ssid = "Galaxy S21";
+const char *password = "123456789";
+
+Adafruit_NeoMatrix matrix = Adafruit_NeoMatrix(5, 5, LED_MATRIX_PIN,
+                                               NEO_MATRIX_TOP + NEO_MATRIX_RIGHT +
+                                                   NEO_MATRIX_COLUMNS + NEO_MATRIX_PROGRESSIVE,
+                                               NEO_GRB + NEO_KHZ800);
 
 const uint16_t red = matrix.Color(255, 0, 0);
 const uint16_t green = matrix.Color(0, 255, 0);
 const uint16_t blue = matrix.Color(0, 0, 255);
+
+void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
+{
+  Serial.println("type");
+  Serial.println(type);
+  switch (type)
+  {
+  case sIOtype_DISCONNECT:
+    Serial.printf("[IOc] Disconnected!\n");
+    break;
+  case sIOtype_CONNECT:
+    Serial.printf("[IOc] Connected to url: %s\n", payload);
+
+    // join default namespace (no auto join in Socket.IO V3)
+    socketIO.send(sIOtype_CONNECT, "/");
+    break;
+  case sIOtype_EVENT:
+    Serial.printf("[IOc] get event: %s\n", payload);
+    break;
+  case sIOtype_ACK:
+    Serial.printf("[IOc] get ack: %u\n", length);
+    //hexdump(payload, length);
+    break;
+  case sIOtype_ERROR:
+    Serial.printf("[IOc] get error: %u\n", length);
+    //hexdump(payload, length);
+    break;
+  case sIOtype_BINARY_EVENT:
+    Serial.printf("[IOc] get binary: %u\n", length);
+    //hexdump(payload, length);
+    break;
+  case sIOtype_BINARY_ACK:
+    Serial.printf("[IOc] get binary ack: %u\n", length);
+    //hexdump(payload, length);
+    break;
+  }
+}
 
 void setup()
 {
@@ -21,8 +69,59 @@ void setup()
 
   matrix.begin();
   matrix.setTextWrap(false);
-  matrix.setBrightness(40);
   matrix.setTextColor(blue);
+
+  int connectionBrightness = 1;
+  bool brightnessDecreasing = false;
+  matrix.fillScreen(blue);
+  matrix.show();
+
+  // disable AP
+  // if (WiFi.getMode() & WIFI_AP)
+  // {
+  //   WiFi.softAPdisconnect(true);
+  // }
+
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    if (connectionBrightness < 40 && !brightnessDecreasing)
+    {
+      connectionBrightness++;
+    }
+    else if (connectionBrightness == 40)
+    {
+      brightnessDecreasing = true;
+      connectionBrightness--;
+    }
+    else if (connectionBrightness == 1)
+    {
+      brightnessDecreasing = false;
+      connectionBrightness++;
+    }
+    else
+    {
+      connectionBrightness--;
+    }
+
+    matrix.setBrightness(connectionBrightness);
+    matrix.show();
+
+    delay(100);
+  }
+
+  String ip = WiFi.localIP().toString();
+  // Serial.println("[SETUP] WiFi Connected " + ip.c_str());
+
+  // server address, port and URL
+  socketIO.begin("http://socketio-server-xing.herokuapp.com", 8080);
+
+  // event handler
+  socketIO.onEvent(socketIOEvent);
+
+  matrix.clear();
+  matrix.setBrightness(40);
 }
 
 bool isLongPress = false;
