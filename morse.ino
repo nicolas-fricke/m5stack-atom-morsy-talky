@@ -192,36 +192,27 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
 
 // Parses the bit we received into dot or dash
 void parseMorse(){
-  if (M5.Btn.wasPressed())
-  {
+  if (M5.Btn.wasPressed()) {
     matrix.fillScreen(green);
-  }
-  else if (M5.Btn.pressedFor(200))
-  {
+  } else if (M5.Btn.pressedFor(200)) {
     isLongPress = true;
     matrix.fillScreen(red);
-  }
-  else if (M5.Btn.wasReleased())
-  {
-    if (isLongPress)
-    {
+  } else if (M5.Btn.wasReleased()) {
+    if (isLongPress) {
       Serial.print("-");
       bitWrite(characterIdentifier, characterCount, 1);
-    }
-    else
-    {
+    } else {
       Serial.print(".");
       bitWrite(characterIdentifier, characterCount, 0);
     }
+
     isLongPress = false;
     isTypingCharacter = true;
     isTypingWord = true;
     characterCount++;
 
     matrix.fillScreen(0);
-  }
-  else if (isTypingCharacter && M5.Btn.releasedFor(500))
-  {
+  } else if (isTypingCharacter && M5.Btn.releasedFor(500)) {
     isTypingCharacter = false;
     Serial.print(" ");
     bitWrite(characterIdentifier, characterCount, 1);
@@ -231,23 +222,27 @@ void parseMorse(){
     Serial.print(" ");
     Serial.println();
 
+    char character = morse[characterIdentifier];
+
     matrix.setCursor(0, 0);
-    matrix.print(morse[characterIdentifier]);
+    matrix.print(character);
 
-    String payload = "[\"input\", \"" + String(morse[characterIdentifier]) + "\"]";
-    Serial.println(payload);
-
-    socketIO.send(sIOtype_EVENT, payload);
+    sendToServerIo(String(character));
 
     characterCount = 0;
     characterIdentifier = 0;
-  }
-  else if (isTypingWord && M5.Btn.releasedFor(1500))
-  {
+  } else if (isTypingWord && M5.Btn.releasedFor(1500)) {
     isTypingWord = false;
     Serial.print("\n\n / \n\n");
     matrix.fillScreen(0);
   }
+}
+
+void sendToServerIo(String message) {
+  String payload = "[\"input\", \"" + String(message) + "\"]";
+  Serial.println(payload);
+
+  socketIO.send(sIOtype_EVENT, payload);
 }
 
 // Detect the maximum and minimum values measured by the sero feedback
