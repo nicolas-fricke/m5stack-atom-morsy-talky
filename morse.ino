@@ -10,7 +10,7 @@
 
 #define LED_MATRIX_PIN 27
 #define SERVO_MOTOR_PIN 22
-#define SERVO_SENSOR_PIN 25
+#define SERVO_SENSOR_PIN 33
 // Connect the Servo's brown wire to ground (G) and the red wire to 3.3V (3V3)
 
 // Initialize the color matrix
