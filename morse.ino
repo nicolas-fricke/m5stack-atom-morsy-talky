@@ -70,6 +70,38 @@ void setup()
   matrix.setTextWrap(false);
   matrix.setTextColor(blue);
 
+  setupWifi();
+
+  matrix.clear();
+  matrix.setBrightness(40);
+}
+
+void loop()
+{
+  socketIO.loop();
+
+  // TODO: Just for debugging. TO REMOVE LATER.
+  if (isFlagRaised()) {
+    matrix.drawPixel(0, 0, blue);
+  } else {
+    matrix.drawPixel(0, 0, 0);
+  }
+
+  resetServo();
+  parseMorse();
+
+  // TODO: Just for debugging. TO REMOVE LATER.
+  if (i < 90) {
+    moveServoToAngle(i);
+    i += 2;
+  }
+
+  matrix.show();
+  delay(50);
+  M5.update();
+}
+
+void setupWifi() {
   int connectionBrightness = 1;
   bool brightnessDecreasing = false;
   matrix.fillScreen(blue);
@@ -112,38 +144,10 @@ void setup()
   // server address, port and URL
   socketIO.begin(SOCKET_IO_HOST, SOCKET_IO_PORT, "/socket.io/?EIO=4");
 
-  Serial.println("[SETUP] Connecting to server " + SOCKET_IO_HOST);
+  Serial.println("[SETUP] Connecting to server " + String(SOCKET_IO_HOST));
 
   // event handler
   socketIO.onEvent(socketIOEvent);
-
-  matrix.clear();
-  matrix.setBrightness(40);
-}
-
-void loop()
-{
-  socketIO.loop();
-
-  // TODO: Just for debugging. TO REMOVE LATER.
-  if (isFlagRaised()) {
-    matrix.drawPixel(0, 0, blue);
-  } else {
-    matrix.drawPixel(0, 0, 0);
-  }
-
-  resetServo();
-  parseMorse();
-
-// TODO: Just for debugging. TO REMOVE LATER.
-  if (i < 90) {
-    moveServoToAngle(i);
-    i += 2;
-  }
-
-  matrix.show();
-  delay(50);
-  M5.update();
 }
 
 void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
