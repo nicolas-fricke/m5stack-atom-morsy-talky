@@ -1,2 +1,4 @@
 #define WIFI_SSID "Pica Pica Guests"
 #define WIFI_PASSWORD "hello world"
+#define SOCKET_IO_HOST "127.0.0.1"
+#define SOCKET_IO_PORT 3000

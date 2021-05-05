@@ -29,9 +29,9 @@ Servo servo;
 int minFlagPosition;
 int maxFlagPosition;
 
-
-// Initialize the Wifi connection
+// SocketIO
 SocketIOclient socketIO;
+bool socketIOisConnected = false;
 
 // Initialize morse parsing
 bool isLongPress = false;
@@ -53,6 +53,8 @@ char morse[256] = "  ETINAMSDRGUKWOHBLZFCP VX Q YJ 56&7   8 /+  ( 94=      3   2
 // TODO: Just for debugging. TO REMOVE LATER.
 int i = 0;
 
+void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length);
+
 void setup()
 {
   Serial.println();
@@ -73,13 +75,9 @@ void setup()
   matrix.fillScreen(blue);
   matrix.show();
 
-  // disable AP
-  // if (WiFi.getMode() & WIFI_AP)
-  // {
-  //   WiFi.softAPdisconnect(true);
-  // }
-
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  Serial.println("[SETUP] Connecting to SSID " + String(WIFI_SSID));
 
   while (WiFi.status() != WL_CONNECTED)
   {
@@ -109,10 +107,12 @@ void setup()
   }
 
   String ip = WiFi.localIP().toString();
-  // Serial.println("[SETUP] WiFi Connected " + ip.c_str());
+  Serial.println("[SETUP] WiFi Connected " + String(ip));
 
   // server address, port and URL
-  socketIO.begin("http://socketio-server-xing.herokuapp.com", 8080);
+  socketIO.begin(SOCKET_IO_HOST, SOCKET_IO_PORT, "/socket.io/?EIO=4");
+
+  Serial.println("[SETUP] Connecting to server " + SOCKET_IO_HOST);
 
   // event handler
   socketIO.onEvent(socketIOEvent);
@@ -123,6 +123,8 @@ void setup()
 
 void loop()
 {
+  socketIO.loop();
+
   // TODO: Just for debugging. TO REMOVE LATER.
   if (isFlagRaised()) {
     matrix.drawPixel(0, 0, blue);
@@ -146,18 +148,20 @@ void loop()
 
 void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
 {
-  Serial.println("type");
-  Serial.println(type);
+  Serial.println("type: " + String(type));
+
   switch (type)
   {
   case sIOtype_DISCONNECT:
     Serial.printf("[IOc] Disconnected!\n");
+    socketIOisConnected = false;
     break;
   case sIOtype_CONNECT:
     Serial.printf("[IOc] Connected to url: %s\n", payload);
 
     // join default namespace (no auto join in Socket.IO V3)
     socketIO.send(sIOtype_CONNECT, "/");
+    socketIOisConnected = true;
     break;
   case sIOtype_EVENT:
     Serial.printf("[IOc] get event: %s\n", payload);
@@ -224,6 +228,11 @@ void parseMorse(){
 
     matrix.setCursor(0, 0);
     matrix.print(morse[characterIdentifier]);
+
+    String payload = "[\"input\", \"" + String(morse[characterIdentifier]) + "\"]";
+    Serial.println(payload);
+
+    socketIO.send(sIOtype_EVENT, payload);
 
     characterCount = 0;
     characterIdentifier = 0;
