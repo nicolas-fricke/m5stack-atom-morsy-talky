@@ -28,6 +28,7 @@ Servo servo;
 
 int minFlagPosition;
 int maxFlagPosition;
+int servoDetachTimeout = 0;
 
 // SocketIO
 SocketIOclient socketIO;
@@ -274,17 +275,15 @@ void moveServoToAngle(int angle) {
     servo.attach(SERVO_MOTOR_PIN);
   }
   servo.write(angle);
+  servoDetachTimeout = 10;
 }
 
 void resetServo() {
-  Serial.print("flagAngle(): ");
-  Serial.print(flagAngle());
-  Serial.print(" servo.read(): ");
-  Serial.println(servo.read());
-
-  if (abs(servo.read() - flagAngle()) < 5) {
+  if (servo.attached() && servoDetachTimeout <= 0) {
     Serial.println("detaching servo");
     servo.detach();
+  } else {
+    servoDetachTimeout--;
   }
 }
 
@@ -297,5 +296,5 @@ int flagAngle() {
 }
 
 bool isFlagRaised() {
-  return flagPosition() > (maxFlagPosition + minFlagPosition) / 2;
+  return flagAngle() > 90;
 }
