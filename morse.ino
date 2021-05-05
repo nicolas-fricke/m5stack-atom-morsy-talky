@@ -85,11 +85,11 @@ void loop()
   socketIO.loop();
 
   if (isFlagRaised()) {
-    if (!morseMessageBuffer.isEmpty()) {    
+    if (!morseMessageBuffer.isEmpty()) {
       sendToServerIo(morseMessageBuffer);
       morseMessageBuffer = "";
       matrix.fillScreen(blue);
-      delay(200);      
+      delay(200);
       moveServoToAngle(0);
     }
   } else {
@@ -178,6 +178,7 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
     break;
   case sIOtype_EVENT:
     Serial.printf("[IOc] get event: %s\n", payload);
+    parseReceivedSocketIoPayload(payload);
     break;
   case sIOtype_ACK:
     Serial.printf("[IOc] get ack: %u\n", length);
@@ -196,6 +197,29 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
     //hexdump(payload, length);
     break;
   }
+}
+
+void parseReceivedSocketIoPayload(uint8_t *payload) {
+  String payloadString = String((char *) payload);
+  String receivedText;
+
+  if (payloadString.indexOf("[\"output\"") == 0) {
+    receivedText = payloadString.substring(11, payloadString.length() - 2);
+    displayReceivedMessage(receivedText);
+  }
+}
+
+void displayReceivedMessage(String receivedText) {
+  moveServoToAngle(90);
+
+  Serial.print("-> received message: ");
+  Serial.println(receivedText);
+
+  // TODO: This isn't working yet...
+  matrix.print(receivedText);
+
+  delay(3000);
+  moveServoToAngle(0);
 }
 
 // Parses the bit we received into dot or dash
