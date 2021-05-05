@@ -1,4 +1,6 @@
-#define WIFI_SSID "Pica Pica Guests"
-#define WIFI_PASSWORD "hello world"
+// Copy this file and call it `config.h`.
+// Then, replace the values with the ones relevant for your environment.
+#define WIFI_SSID "My Wifi"
+#define WIFI_PASSWORD "top-secret"
 #define SOCKET_IO_HOST "127.0.0.1"
 #define SOCKET_IO_PORT 3000
