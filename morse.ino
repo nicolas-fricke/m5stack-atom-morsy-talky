@@ -45,6 +45,9 @@ bool isTypingWord = false;
 byte characterCount = 0;
 byte characterIdentifier = 0;
 
+// Buffer for the currently typed morse message
+String morseMessageBuffer = "";
+
 // With that encoding, this lookup table can be used to translate the caracters
 // to alphanumerics:
 //                 0         1         2         3         4         5         6
@@ -81,15 +84,20 @@ void loop()
 {
   socketIO.loop();
 
-  // TODO: Just for debugging. TO REMOVE LATER.
   if (isFlagRaised()) {
-    matrix.drawPixel(0, 0, blue);
+    if (!morseMessageBuffer.isEmpty()) {    
+      sendToServerIo(morseMessageBuffer);
+      morseMessageBuffer = "";
+      matrix.fillScreen(blue);
+      delay(200);      
+      moveServoToAngle(0);
+    }
   } else {
-    matrix.drawPixel(0, 0, 0);
+    matrix.fillScreen(0);
+    parseMorse();
   }
 
   resetServo();
-  parseMorse();
 
   // TODO: Just for debugging. TO REMOVE LATER.
   if (i < 90) {
@@ -227,13 +235,14 @@ void parseMorse(){
     matrix.setCursor(0, 0);
     matrix.print(character);
 
-    sendToServerIo(String(character));
+    morseMessageBuffer = morseMessageBuffer + String(character);
 
     characterCount = 0;
     characterIdentifier = 0;
   } else if (isTypingWord && M5.Btn.releasedFor(1500)) {
     isTypingWord = false;
     Serial.print("\n\n / \n\n");
+    morseMessageBuffer = morseMessageBuffer + " ";
     matrix.fillScreen(0);
   }
 }
