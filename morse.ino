@@ -145,7 +145,7 @@ void loopIdle() {
 
 // 3. TYPING: handle morse code like you know, on flag raised to 90, send text, lower flag and change to IDLE
 void loopTyping() {
-  if (isFlagRaised()) {
+  if (isFlagRaised() || morseMessageBuffer.substring(morseMessageBuffer.length() - 2) == "  ") {
     if (!morseMessageBuffer.isEmpty()) {
       sendTextToServerIo(morseMessageBuffer);
       morseMessageBuffer = "";
