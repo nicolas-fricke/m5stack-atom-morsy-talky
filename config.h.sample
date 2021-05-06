@@ -5,3 +5,4 @@
 #define SOCKET_IO_HOST "127.0.0.1"
 #define SOCKET_IO_PORT 3000
 #define MY_NAME "Pepito"
+#define SERVO_WITH_FEEDBACK true

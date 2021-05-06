@@ -430,13 +430,13 @@ int flagAngle() {
 }
 
 bool isFlagLowered() {
-  return flagAngle() < 30;
+  return SERVO_WITH_FEEDBACK && flagAngle() < 30;
 }
 
 bool isFlagRaised() {
-  return flagAngle() > 80 && flagAngle() < 130;
+  return SERVO_WITH_FEEDBACK && flagAngle() > 80 && flagAngle() < 130;
 }
 
 bool isFlagInTypingPosition() {
-  return flagAngle() > 150;
+  return SERVO_WITH_FEEDBACK && flagAngle() > 150;
 }
