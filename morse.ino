@@ -140,6 +140,12 @@ void loopIdle() {
   }
   if (M5.Btn.wasPressed()) {
     moveServoToAngle(180);
+
+    if (!SERVO_WITH_FEEDBACK) {
+      setCurrentState(typing);
+      sendTypingToServerIo();
+      return;
+    }
   }
 }
 
