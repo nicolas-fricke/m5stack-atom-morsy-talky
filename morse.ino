@@ -13,6 +13,14 @@
 #define SERVO_SENSOR_PIN 33
 // Connect the Servo's brown wire to ground (G) and the red wire to 3.3V (3V3)
 
+enum State {
+  idle,
+  typing,
+  reading,
+  receiving
+};
+State currentState;
+
 // Initialize the color matrix
 Adafruit_NeoMatrix matrix = Adafruit_NeoMatrix(5, 5, LED_MATRIX_PIN,
   NEO_MATRIX_TOP + NEO_MATRIX_RIGHT +
@@ -22,6 +30,8 @@ Adafruit_NeoMatrix matrix = Adafruit_NeoMatrix(5, 5, LED_MATRIX_PIN,
 const uint16_t red = matrix.Color(255, 0, 0);
 const uint16_t green = matrix.Color(0, 255, 0);
 const uint16_t blue = matrix.Color(0, 0, 255);
+
+int textScrollPosition = 0;
 
 // Initialize the servo
 Servo servo;
@@ -33,6 +43,7 @@ int servoDetachTimeout = 0;
 // SocketIO
 SocketIOclient socketIO;
 bool socketIOisConnected = false;
+String receivedText;
 
 // Initialize morse parsing
 bool isLongPress = false;
@@ -78,36 +89,116 @@ void setup()
 
   matrix.clear();
   matrix.setBrightness(40);
+
+  moveServoToAngle(0);
+  delay(500);
+  setCurrentState(idle);
 }
 
 void loop()
 {
   socketIO.loop();
-
-  if (isFlagRaised()) {
-    if (!morseMessageBuffer.isEmpty()) {
-      sendToServerIo(morseMessageBuffer);
-      morseMessageBuffer = "";
-      matrix.fillScreen(blue);
-      delay(200);
-      moveServoToAngle(0);
-    }
-  } else {
-    matrix.fillScreen(0);
-    parseMorse();
-  }
-
   resetServo();
 
-  // TODO: Just for debugging. TO REMOVE LATER.
-  if (i < 90) {
-    moveServoToAngle(i);
-    i += 2;
+  switch (currentState) {
+    // 1. IDLE: flag is moved to 180? send msg "wait for message", change to TYPING
+    // 2. IDLE: receive "wait for message", engage servo, change to RECEIVING
+    case idle:
+      loopIdle();
+      break;
+    // 3. TYPING: handle morse code like you know, on flag raised to 90, send text, lower flag and change to IDLE
+    case typing:
+      loopTyping();
+      break;
+    // 4. RECEIVING: engage servo and move flag to 180, on message with text, move flag to 90 and change to READING
+    case receiving:
+      loopReceiving();
+      break;
+    // 5. READING: display the message, detach servo. on flag lowered, change to IDLE
+    case reading:
+      loopReading();
+      break;
   }
 
   matrix.show();
   delay(50);
   M5.update();
+}
+
+// 1. IDLE: flag is moved to 180? send msg "wait for message", change to TYPING
+// 2. IDLE: receive "wait for message", engage servo, change to RECEIVING
+void loopIdle() {
+  matrix.fillScreen(0);
+
+  if (isFlagInTypingPosition()) {
+    setCurrentState(typing);
+    sendTypingToServerIo();
+    return;
+  }
+  if (M5.Btn.wasPressed()) {
+    moveServoToAngle(180);
+  }
+}
+
+// 3. TYPING: handle morse code like you know, on flag raised to 90, send text, lower flag and change to IDLE
+void loopTyping() {
+  if (isFlagRaised()) {
+    if (!morseMessageBuffer.isEmpty()) {
+      sendTextToServerIo(morseMessageBuffer);
+      morseMessageBuffer = "";
+      matrix.fillScreen(blue);
+      delay(200);
+    }
+
+    moveServoToAngle(0);
+    delay(500);
+    setCurrentState(idle);
+    return;
+  }
+
+  matrix.fillScreen(0);
+  parseMorse();
+}
+
+// 4. RECEIVING: engage servo and move flag to 180, on message with text, move flag to 90 and change to READING
+void loopReceiving() {
+  moveServoToAngle(180); // Also ensures that the servo cannot be turned by hand
+}
+
+// 5. READING: display the message, detach servo. on flag lowered, change to IDLE
+void loopReading() {
+  matrix.fillScreen(0);
+
+  if (isFlagLowered() || M5.Btn.wasPressed()) {
+    if(M5.Btn.wasPressed()) {
+      moveServoToAngle(0);
+    }
+    setCurrentState(idle);
+    return;
+  }
+  if (isFlagInTypingPosition()) {
+    setCurrentState(typing);
+    sendTypingToServerIo();
+    return;
+  }
+
+  matrix.setTextColor(blue);
+
+  matrix.setCursor(textScrollPosition, 0);
+  matrix.print(receivedText);
+
+  // The scroll length needs to be 5 steps per character plus a spacing between
+  // the end and the beginning of the next scroll iteration
+  if(--textScrollPosition < (receivedText.length() * -5 - 30)) {
+    textScrollPosition = matrix.width();
+  }
+}
+
+void setCurrentState(State nextState) {
+  Serial.print("Setting state to: ");
+  Serial.println(String(nextState));
+
+  currentState = nextState;
 }
 
 void setupWifi() {
@@ -163,8 +254,7 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
 {
   Serial.println("type: " + String(type));
 
-  switch (type)
-  {
+  switch (type) {
   case sIOtype_DISCONNECT:
     Serial.printf("[IOc] Disconnected!\n");
     socketIOisConnected = false;
@@ -201,29 +291,30 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
 
 void parseReceivedSocketIoPayload(uint8_t *payload) {
   String payloadString = String((char *) payload);
-  String receivedText;
 
-  if (payloadString.indexOf("[\"output\"") == 0) {
-    receivedText = payloadString.substring(11, payloadString.length() - 2);
-    displayReceivedMessage(receivedText);
+  if (payloadString.indexOf("[\"message\"") == 0) {
+    receivedText = payloadString.substring(12, payloadString.length() - 2);
+    Serial.print("-> received message: ");
+    Serial.println(receivedText);
+
+    if (currentState == receiving) {
+      moveServoToAngle(90);
+      delay(500);
+      setCurrentState(reading);
+    }
+
+    return;
+  }
+
+  if (payloadString.indexOf("[\"wait_for_message\"") == 0 && currentState == idle) {
+    setCurrentState(receiving);
+
+    return;
   }
 }
 
-void displayReceivedMessage(String receivedText) {
-  moveServoToAngle(90);
-
-  Serial.print("-> received message: ");
-  Serial.println(receivedText);
-
-  // TODO: This isn't working yet...
-  matrix.print(receivedText);
-
-  delay(3000);
-  moveServoToAngle(0);
-}
-
 // Parses the bit we received into dot or dash
-void parseMorse(){
+void parseMorse() {
   if (M5.Btn.wasPressed()) {
     matrix.fillScreen(green);
   } else if (M5.Btn.pressedFor(200)) {
@@ -271,8 +362,15 @@ void parseMorse(){
   }
 }
 
-void sendToServerIo(String message) {
-  String payload = "[\"input\", \"" + String(message) + "\"]";
+void sendTextToServerIo(String message) {
+  String payload = "[\"message\", \"" + String(message) + "\"]";
+  Serial.println(payload);
+
+  socketIO.send(sIOtype_EVENT, payload);
+}
+
+void sendTypingToServerIo() {
+  String payload = "[\"typing\", \"" + String(MY_NAME) + "\"]";
   Serial.println(payload);
 
   socketIO.send(sIOtype_EVENT, payload);
@@ -323,6 +421,14 @@ int flagAngle() {
   return 180.0 * (flagPosition() - minFlagPosition) / maxFlagPosition;
 }
 
+bool isFlagLowered() {
+  return flagAngle() < 30;
+}
+
 bool isFlagRaised() {
-  return flagAngle() > 90;
+  return flagAngle() > 80 && flagAngle() < 130;
+}
+
+bool isFlagInTypingPosition() {
+  return flagAngle() > 150;
 }
