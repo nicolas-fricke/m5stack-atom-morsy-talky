@@ -32,7 +32,7 @@ Adafruit_NeoMatrix matrix = Adafruit_NeoMatrix(5, 5, LED_MATRIX_PIN,
 const uint16_t red = matrix.Color(255, 0, 0);
 const uint16_t green = matrix.Color(0, 255, 0);
 const uint16_t blue = matrix.Color(0, 0, 255);
-const uint16_t yellow = matrix.Color(255, 255, 0);
+const uint16_t purple = matrix.Color(255, 0, 255);
 
 int textScrollPosition = 0;
 
@@ -337,7 +337,7 @@ void parseMorse() {
     matrix.fillScreen(red);
 
     if (M5.Btn.pressedFor(1000)) {
-      matrix.fillScreen(yellow);
+      matrix.fillScreen(purple);
       isLongPress = false;
       isSpaceCharacter = true;
     }
