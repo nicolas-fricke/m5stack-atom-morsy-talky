@@ -13,6 +13,8 @@
 #define SERVO_SENSOR_PIN 33
 // Connect the Servo's brown wire to ground (G) and the red wire to 3.3V (3V3)
 
+#define MATRIX_WIDTH 5
+
 enum State {
   idle,
   typing,
@@ -170,6 +172,7 @@ void loopReading() {
   matrix.fillScreen(0);
 
   if (isFlagLowered() || M5.Btn.wasPressed()) {
+    textScrollPosition = 0;
     if(M5.Btn.wasPressed()) {
       moveServoToAngle(0);
     }
@@ -177,6 +180,7 @@ void loopReading() {
     return;
   }
   if (isFlagInTypingPosition()) {
+    textScrollPosition = 0;
     setCurrentState(typing);
     sendTypingToServerIo();
     return;
@@ -184,14 +188,18 @@ void loopReading() {
 
   matrix.setTextColor(blue);
 
-  matrix.setCursor(textScrollPosition, 0);
+  matrix.setCursor(textScrollPosition + MATRIX_WIDTH, 0);
   matrix.print(receivedText);
+
+  --textScrollPosition;
 
   // The scroll length needs to be 5 steps per character plus a spacing between
   // the end and the beginning of the next scroll iteration
-  if(--textScrollPosition < (receivedText.length() * -5 - 30)) {
-    textScrollPosition = matrix.width();
+  if(textScrollPosition < -(receivedText.length() * MATRIX_WIDTH + 30)) {
+    textScrollPosition = 0;
   }
+
+  delay(30); // Make the text scrolling a bit slower
 }
 
 void setCurrentState(State nextState) {
