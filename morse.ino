@@ -68,8 +68,7 @@ String morseMessageBuffer = "";
 //                 01234567890123456789012345678901234567890123456789012345678901234
 char morse[256] = "  ETINAMSDRGUKWOHBLZFCP VX Q YJ 56&7   8 /+  ( 94=      3   2 10";
 
-// TODO: Just for debugging. TO REMOVE LATER.
-int i = 0;
+int lastInteractionAt = 0;
 
 void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length);
 
@@ -102,6 +101,20 @@ void loop()
 {
   socketIO.loop();
   resetServo();
+
+  // Reset in case of too long inactivity
+  if (millis() - lastInteractionAt > 120000) {
+    if (currentState == typing) {
+      sendAbortToServerIo();
+    }
+    resetStateToIdle();
+  }
+  
+  // Allow anyone to reset all devices with super long press
+  if (M5.Btn.pressedFor(5000)) {
+    sendAbortToServerIo();
+    resetStateToIdle();    
+  }
 
   switch (currentState) {
     // 1. IDLE: flag is moved to 180? send msg "wait for message", change to TYPING
@@ -220,7 +233,23 @@ void setCurrentState(State nextState) {
   Serial.print("Setting state to: ");
   Serial.println(String(nextState));
 
+  lastInteractionAt = millis();
+
   currentState = nextState;
+}
+
+void resetStateToIdle() {
+  moveServoToAngle(0);
+  delay(500);
+  matrix.fillScreen(0);
+  receivedText = "";
+  isLongPress = false;
+  isTypingCharacter = false;
+  isSpaceCharacter = false;
+  characterCount = 0;
+  characterIdentifier = 0;
+  morseMessageBuffer = "";
+  setCurrentState(idle);
 }
 
 void setupWifi() {
@@ -336,12 +365,19 @@ void parseReceivedSocketIoPayload(uint8_t *payload) {
 
     return;
   }
+
+  if (payloadString.indexOf("[\"abort\"") == 0) {
+    resetStateToIdle();
+
+    return;
+  }
 }
 
 // Parses the bit we received into dot or dash
 void parseMorse() {
   if (M5.Btn.wasPressed()) {
     matrix.fillScreen(green);
+    lastInteractionAt = millis();
   } else if (M5.Btn.pressedFor(250)) {
     isLongPress = true;
     matrix.fillScreen(red);
@@ -400,17 +436,22 @@ void parseMorse() {
 }
 
 void sendTextToServerIo(String message) {
-  String payload = "[\"message\", \"" + String(message) + "\"]";
-  Serial.println(payload);
-
-  socketIO.send(sIOtype_EVENT, payload);
+  sendToServerIo("message", String(message));
 }
 
 void sendTypingToServerIo() {
-  String payload = "[\"typing\", \"" + String(MY_NAME) + "\"]";
+  sendToServerIo("typing", String(MY_NAME));
+}
+
+void sendAbortToServerIo() {
+  sendToServerIo("abort", String(MY_NAME));
+}
+
+void sendToServerIo(String type, String message) {
+  String payload = "[\"" + type + "\", \"" + message + "\"]";
   Serial.println(payload);
 
-  socketIO.send(sIOtype_EVENT, payload);
+  socketIO.send(sIOtype_EVENT, payload);  
 }
 
 // Detect the maximum and minimum values measured by the sero feedback
