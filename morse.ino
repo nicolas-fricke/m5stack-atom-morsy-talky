@@ -172,6 +172,7 @@ void loopTyping() {
 // 4. RECEIVING: engage servo and move flag to 180, on message with text, move flag to 90 and change to READING
 void loopReceiving() {
   moveServoToAngle(180); // Also ensures that the servo cannot be turned by hand
+  scrollTextOnMatrix(receivedText, purple); // display name of sender
 }
 
 // 5. READING: display the message, detach servo. on flag lowered, change to IDLE
@@ -193,16 +194,22 @@ void loopReading() {
     return;
   }
 
-  matrix.setTextColor(blue);
+  scrollTextOnMatrix(receivedText, blue);
+}
+
+void scrollTextOnMatrix(String text, uint16_t color) {
+  matrix.fillScreen(0);
+
+  matrix.setTextColor(color);
 
   matrix.setCursor(textScrollPosition + MATRIX_WIDTH, 0);
-  matrix.print(receivedText);
+  matrix.print(text);
 
   --textScrollPosition;
 
   // The scroll length needs to be 5 steps per character plus a spacing between
   // the end and the beginning of the next scroll iteration
-  if(textScrollPosition < -(receivedText.length() * MATRIX_WIDTH + 30)) {
+  if(textScrollPosition < -(text.length() * MATRIX_WIDTH + 30)) {
     textScrollPosition = 0;
   }
 
@@ -308,11 +315,12 @@ void parseReceivedSocketIoPayload(uint8_t *payload) {
   String payloadString = String((char *) payload);
 
   if (payloadString.indexOf("[\"message\"") == 0) {
-    receivedText = payloadString.substring(12, payloadString.length() - 2);
     Serial.print("-> received message: ");
     Serial.println(receivedText);
 
     if (currentState == receiving) {
+      receivedText = payloadString.substring(12, payloadString.length() - 2);
+      textScrollPosition = 0;
       moveServoToAngle(90);
       delay(500);
       setCurrentState(reading);
@@ -322,6 +330,8 @@ void parseReceivedSocketIoPayload(uint8_t *payload) {
   }
 
   if (payloadString.indexOf("[\"wait_for_message\"") == 0 && currentState == idle) {
+    receivedText = payloadString.substring(21, payloadString.length() - 2);
+    textScrollPosition = 0;
     setCurrentState(receiving);
 
     return;
@@ -332,7 +342,7 @@ void parseReceivedSocketIoPayload(uint8_t *payload) {
 void parseMorse() {
   if (M5.Btn.wasPressed()) {
     matrix.fillScreen(green);
-  } else if (M5.Btn.pressedFor(200)) {
+  } else if (M5.Btn.pressedFor(250)) {
     isLongPress = true;
     matrix.fillScreen(red);
 
@@ -379,7 +389,9 @@ void parseMorse() {
 
     matrix.setCursor(0, 0);
     matrix.print(character);
-
+    matrix.show();
+    delay(50);
+    
     morseMessageBuffer = morseMessageBuffer + String(character);
 
     characterCount = 0;
