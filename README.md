@@ -1,10 +1,17 @@
 # Morsey-Talky
 
+This is the result of a fun hackweek project at Xing.
+
+We're using an [M5Atom Matrix](https://shop.m5stack.com/collections/m5-atom/products/atom-matrix-esp32-development-kit) development board to build a distributed Morse telegraph.
+Each device connects to a central SocketIO server.
+Then, one person can type a message using morse code and it will get displayed to all others.
+If you connect a servo as described below and connect a little flag to it, it will also raise the flag to indicate the state you're currently in.
+
 ## Hardware
 
 You will need:
 
-* M5-ATOM
+* [M5-ATOM Matrix](https://shop.m5stack.com/collections/m5-atom/products/atom-matrix-esp32-development-kit)
 * A servo motor with a feedback wire (feedback is optional)
 * USB-C cable to connect the M5-ATOM to a power source
 * A flag you can build yourself and glue/attach to the arm of the servo
